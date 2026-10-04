@@ -71,7 +71,7 @@ Lucie request usage: 1200 input tokens, 300 output tokens, estimated cost ~$0.01
 To also save those logs in PostgreSQL, add `DATABASE_URL` to `server/.env`:
 
 ```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/lucie_marketplace_poc
+DATABASE_URL=postgres://postgres@localhost:5433/lucie_marketplace_poc
 ```
 
 The backend automatically creates this table on first insert:
@@ -84,6 +84,19 @@ The SQL schema is also available at:
 
 ```text
 server/db/lucie_usage_logs.sql
+```
+
+For this local Windows POC, a separate local Postgres cluster can run from:
+
+```text
+server/.pgdata
+```
+
+Start it with:
+
+```powershell
+cd server
+.\scripts\start-local-postgres.ps1
 ```
 
 Cost estimates use these defaults, which can be changed in `server/.env`:
