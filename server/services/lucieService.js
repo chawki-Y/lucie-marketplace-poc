@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { getLucieModel } from "./aiConfig.js";
+import { logLucieUsage } from "./usageLogger.js";
 import { getListingDetails } from "../tools/getListingDetails.js";
 import { searchListings } from "../tools/searchListings.js";
 
@@ -120,6 +121,34 @@ async function runToolCall(toolCall) {
   };
 }
 
+function addUsageTotals(totalUsage, usage = {}) {
+  return {
+    inputTokens: totalUsage.inputTokens + (usage.input_tokens || 0),
+    outputTokens: totalUsage.outputTokens + (usage.output_tokens || 0),
+    totalTokens: totalUsage.totalTokens + (usage.total_tokens || 0)
+  };
+}
+
+async function finishLucieResponse({ model, messages, message, products, toolsCalled, totalUsage }) {
+  const lastUserMessage = [...messages].reverse().find((item) => item.role === "user");
+
+  await logLucieUsage({
+    model,
+    userPrompt: lastUserMessage?.content || "",
+    responseText: message,
+    inputTokens: totalUsage.inputTokens,
+    outputTokens: totalUsage.outputTokens,
+    totalTokens: totalUsage.totalTokens,
+    products,
+    toolsCalled
+  });
+
+  return {
+    message,
+    products
+  };
+}
+
 export async function chatWithLucie(messages) {
   const client = getOpenAIClient();
 
@@ -132,6 +161,13 @@ export async function chatWithLucie(messages) {
   }
 
   const foundProducts = new Map();
+  const toolsCalled = [];
+  let totalUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0
+  };
+  const model = getLucieModel();
   let input = messages.map((message) => ({
     role: message.role,
     content: message.content.trim()
@@ -139,26 +175,35 @@ export async function chatWithLucie(messages) {
 
   for (let step = 0; step < 3; step += 1) {
     const response = await client.responses.create({
-      model: getLucieModel(),
+      model,
       instructions: SYSTEM_PROMPT,
       input,
       tools,
       tool_choice: "auto"
     });
 
+    totalUsage = addUsageTotals(totalUsage, response.usage);
     const functionCalls = response.output.filter((item) => item.type === "function_call");
 
     if (functionCalls.length === 0) {
-      return {
+      return finishLucieResponse({
+        model,
+        messages,
         message: response.output_text || "I can help you search the marketplace. What are you looking for?",
-        products: Array.from(foundProducts.values()).slice(0, 4)
-      };
+        products: Array.from(foundProducts.values()).slice(0, 4),
+        toolsCalled,
+        totalUsage
+      });
     }
 
     input = input.concat(response.output);
 
     for (const toolCall of functionCalls) {
       const result = await runToolCall(toolCall);
+      toolsCalled.push({
+        name: toolCall.name,
+        arguments: parseArguments(toolCall.arguments)
+      });
 
       result.products.forEach((product) => {
         foundProducts.set(product.id, product);
@@ -172,8 +217,12 @@ export async function chatWithLucie(messages) {
     }
   }
 
-  return {
+  return finishLucieResponse({
+    model,
+    messages,
     message: "I found a few marketplace options that may help. Here are the strongest matches from the listings.",
-    products: Array.from(foundProducts.values()).slice(0, 4)
-  };
+    products: Array.from(foundProducts.values()).slice(0, 4),
+    toolsCalled,
+    totalUsage
+  });
 }

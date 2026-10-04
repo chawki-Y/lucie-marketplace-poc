@@ -60,6 +60,39 @@ gpt-5.6
 
 You can change it in `server/services/aiConfig.js` or set `OPENAI_MODEL` in `server/.env`.
 
+## Usage Cost Logging
+
+After every successful Lucie request, the backend prints token usage and an estimated request cost:
+
+```text
+Lucie request usage: 1200 input tokens, 300 output tokens, estimated cost ~$0.0108
+```
+
+To also save those logs in PostgreSQL, add `DATABASE_URL` to `server/.env`:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/lucie_marketplace_poc
+```
+
+The backend automatically creates this table on first insert:
+
+```text
+lucie_usage_logs
+```
+
+The SQL schema is also available at:
+
+```text
+server/db/lucie_usage_logs.sql
+```
+
+Cost estimates use these defaults, which can be changed in `server/.env`:
+
+```env
+OPENAI_INPUT_RATE_PER_MILLION=4
+OPENAI_OUTPUT_RATE_PER_MILLION=20
+```
+
 ## API Key Setup
 
 Create a file at:
