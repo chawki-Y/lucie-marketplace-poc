@@ -6,6 +6,8 @@
   "scripts": {
     "db:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-local-postgres.ps1",
     "db:start": "powershell -ExecutionPolicy Bypass -File ./scripts/start-local-postgres.ps1",
+    "db:local:start": "./.pg-local/pgsql/bin/pg_ctl.exe -D ./.pgdata -o \"-p 5433\" -l ./.pgdata/logs/postgres.log -w start",
+    "db:local:stop": "./.pg-local/pgsql/bin/pg_ctl.exe -D ./.pgdata stop",
     "dev": "node --watch server.js",
     "start": "node server.js"
   },

@@ -15,6 +15,13 @@ This repo is worked on by multiple AI agents from separate local clones. Convent
 
 Keep entries short — a few bullet points, not a full diff. The next agent should be able to read this log alone and know what state the repo is in.
 
+### 2026-10-14 — Claude (Claude Code)
+- Got Postgres usage logging actually working end-to-end. The system PostgreSQL 18 install here was missing `initdb.exe`/`pg_ctl.exe`/`createdb.exe` and Docker Desktop wouldn't start headlessly, so instead of touching the system install, downloaded the official EDB portable Windows binaries and set up a project-local cluster at `server/.pg-local` + `server/.pgdata` (port 5433, trust auth, no system changes, no Windows service).
+- Applied `db/lucie_usage_logs.sql` schema and `db/seed_usage_logs.sql`, then verified with a live `/api/lucie/chat` request — confirmed a real row landed in `lucie_usage_logs` with correct tokens/cost, no more "database write failed" errors.
+- Added `npm run db:local:start` / `db:local:stop` in `server/package.json` for this specific setup; see new "Local Postgres without a system install" README section above.
+- Also fixed the OpenAI key not reloading: `node --watch` doesn't watch `.env`, so editing it alone doesn't apply — needs a restart (`touch server.js`) to re-run `dotenv.config()`.
+- Next: open for the next task/direction from Chawki.
+
 ### 2026-10-13 — Claude (Claude Code)
 - Cloned the repo and reviewed the full codebase: client (React/Vite) and server (Express, OpenAI Responses API, `searchListings`/`getListingDetails` tools, local JSON data, optional Postgres usage logging).
 - No functional code changes in this entry — this was a review pass plus setting up this sync log.
@@ -89,6 +96,18 @@ To also save those logs in PostgreSQL, add `DATABASE_URL` to `server/.env`:
 ```env
 DATABASE_URL=postgres://postgres@localhost:5433/lucie_marketplace_poc
 ```
+
+### Local Postgres without a system install
+
+The system-wide PostgreSQL 18 install on this machine was missing `initdb.exe`/`pg_ctl.exe`/`createdb.exe` (client-tools-only install), so `npm run db:setup` below won't work here. Instead, a project-local, portable Postgres lives at `server/.pg-local/pgsql` (official EDB binaries, `bin/` + `share/` + `lib/` only, gitignored) with its own cluster at `server/.pgdata` on port 5433, trust auth, matching the `DATABASE_URL` already in `.env`. It does **not** touch the system Postgres install or register a Windows service.
+
+```bash
+cd server
+npm run db:local:start   # start it
+npm run db:local:stop    # stop it
+```
+
+If a machine has a working full PostgreSQL 18 install instead, use the scripts below (`db:setup` / `db:start`) and ignore this section.
 
 On Windows with PostgreSQL 18 installed, this POC includes an automatic setup script:
 
