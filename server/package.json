@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-local-postgres.ps1",
+    "db:start": "powershell -ExecutionPolicy Bypass -File ./scripts/start-local-postgres.ps1",
     "dev": "node --watch server.js",
     "start": "node server.js"
   },

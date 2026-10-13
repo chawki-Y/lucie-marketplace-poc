@@ -74,6 +74,22 @@ To also save those logs in PostgreSQL, add `DATABASE_URL` to `server/.env`:
 DATABASE_URL=postgres://postgres@localhost:5433/lucie_marketplace_poc
 ```
 
+On Windows with PostgreSQL 18 installed, this POC includes an automatic setup script:
+
+```powershell
+cd server
+npm run db:setup
+```
+
+That command:
+
+- creates `server/.pgdata` if needed
+- starts a local Postgres server on port `5433`
+- creates the `lucie_marketplace_poc` database
+- creates the `lucie_usage_logs` table
+- seeds test usage-log rows
+- writes `DATABASE_URL=postgres://postgres@localhost:5433/lucie_marketplace_poc` into `server/.env`
+
 The backend automatically creates this table on first insert:
 
 ```text
@@ -96,7 +112,13 @@ Start it with:
 
 ```powershell
 cd server
-.\scripts\start-local-postgres.ps1
+npm run db:start
+```
+
+To inspect the seeded logs manually:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5433 -U postgres -d lucie_marketplace_poc -c "SELECT * FROM lucie_usage_logs ORDER BY id DESC;"
 ```
 
 Cost estimates use these defaults, which can be changed in `server/.env`:
