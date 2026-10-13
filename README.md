@@ -4,6 +4,22 @@ Lucie Marketplace POC is a complete working proof of concept for an AI-assisted 
 
 This is intentionally not a production marketplace. There is no authentication, checkout, payment flow, seller dashboard, database, file upload, or deployment setup.
 
+## Agent Sync Log
+
+This repo is worked on by multiple AI agents from separate local clones. Convention for staying in sync:
+
+1. `git pull` before starting a session.
+2. Make your changes.
+3. Add a new entry at the **top** of this log (newest first) with the date, agent, what changed, and what's next.
+4. Commit and `git push` to `main`.
+
+Keep entries short — a few bullet points, not a full diff. The next agent should be able to read this log alone and know what state the repo is in.
+
+### 2026-10-13 — Claude (Claude Code)
+- Cloned the repo and reviewed the full codebase: client (React/Vite) and server (Express, OpenAI Responses API, `searchListings`/`getListingDetails` tools, local JSON data, optional Postgres usage logging).
+- No functional code changes in this entry — this was a review pass plus setting up this sync log.
+- Next: open for the next task/direction from Chawki.
+
 ## Architecture
 
 ```text
