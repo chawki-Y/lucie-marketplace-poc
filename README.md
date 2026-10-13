@@ -15,6 +15,14 @@ This repo is worked on by multiple AI agents from separate local clones. Convent
 
 Keep entries short — a few bullet points, not a full diff. The next agent should be able to read this log alone and know what state the repo is in.
 
+### 2026-10-14 — Claude (Claude Code) [2]
+- Got a working pgAdmin4 to browse the local DB visually. The system pgAdmin4 install was also broken (missing its entire `pgadmin` Python source package — same partial-install pattern as the missing Postgres CLI tools below). Rather than touch the system install, `pip install --target`'d the standalone `pgadmin4` package into `server/.pgadmin-local/site-packages` using the broken install's own bundled Python purely as a runtime.
+- Had to work around the bundled Python resolving `psycopg` from the system's (also broken) site-packages instead of the freshly installed one — fixed with a small launcher (`server/.pgadmin-local/launch.py`) that inserts the isolated path first in `sys.path`.
+- Registered the Lucie Postgres connection (`localhost:5433`, trust auth, db `lucie_marketplace_poc`) into pgAdmin's own config via its `setup.py load-servers` command — confirmed the row landed correctly in pgAdmin's SQLite config.
+- Added `npm run pgadmin:start` in `server/package.json`. Run it, then open http://127.0.0.1:5050 — look for "Lucie Marketplace POC" in the server tree, no password needed (trust auth).
+- Note: this is optional. The DB and usage logging already work and were verified via plain `psql` before this — pgAdmin is just a nicer way to look at the same data.
+- Next: open for the next task/direction from Chawki.
+
 ### 2026-10-14 — Claude (Claude Code)
 - Got Postgres usage logging actually working end-to-end. The system PostgreSQL 18 install here was missing `initdb.exe`/`pg_ctl.exe`/`createdb.exe` and Docker Desktop wouldn't start headlessly, so instead of touching the system install, downloaded the official EDB portable Windows binaries and set up a project-local cluster at `server/.pg-local` + `server/.pgdata` (port 5433, trust auth, no system changes, no Windows service).
 - Applied `db/lucie_usage_logs.sql` schema and `db/seed_usage_logs.sql`, then verified with a live `/api/lucie/chat` request — confirmed a real row landed in `lucie_usage_logs` with correct tokens/cost, no more "database write failed" errors.
@@ -108,6 +116,17 @@ npm run db:local:stop    # stop it
 ```
 
 If a machine has a working full PostgreSQL 18 install instead, use the scripts below (`db:setup` / `db:start`) and ignore this section.
+
+### Browsing the DB with pgAdmin4
+
+The system pgAdmin4 install on this machine was also broken (same partial-install issue as above — its `pgadmin` Python source package was missing). A project-local pgAdmin4 lives at `server/.pgadmin-local` (pip-installed, isolated, gitignored), already configured with a "Lucie Marketplace POC" server pointing at the local Postgres above.
+
+```bash
+cd server
+npm run pgadmin:start
+```
+
+Then open http://127.0.0.1:5050 — no login needed (desktop mode), the server connection is already registered. This is entirely optional: `lucie_usage_logs` can also be queried directly with `./.pg-local/pgsql/bin/psql.exe -h localhost -p 5433 -U postgres -d lucie_marketplace_poc`.
 
 On Windows with PostgreSQL 18 installed, this POC includes an automatic setup script:
 

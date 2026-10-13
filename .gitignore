@@ -4,6 +4,7 @@ node_modules/
 dist/
 server/.pgdata/
 server/.pg-local/
+server/.pgadmin-local/
 .DS_Store
 npm-debug.log*
 coverage/
