@@ -25,6 +25,17 @@ Two agents work on this repo at once, so each gets its own branch to avoid stepp
 
 Pull `main` into your branch before starting a session, do your work on your own branch, then merge (or PR) back into `main` once it's verified — don't push work-in-progress straight to `main`.
 
+### 2026-10-17 — Claude (Claude Code)
+- Switched the shared database from local-only Postgres to a **Neon** Postgres instance, so every machine/agent pulling this repo can point at the same data instead of each running its own isolated local DB.
+- Used Neon's "Claimable" flow (`neon claim create`) to provision a real project with no account needed up front — Project ID `round-poetry-33509274`, region `aws-us-east-2`, unclaimed, expires `2026-10-20T09:19:11Z`. **Needs to be claimed into Chawki's Neon account before then** or the data is lost — see the new "Shared Neon Postgres" README section.
+- Applied `db/lucie_usage_logs.sql` + `db/seed_usage_logs.sql` to it and verified end-to-end with a live `/api/lucie/chat` request — row landed correctly.
+- Updated `server/services/db.js` to set `ssl: { rejectUnauthorized: true }` explicitly for non-localhost connections (fixes a `pg` deprecation warning from relying on `sslmode=require` in the URL, and is the standard way to connect `node-postgres` to Neon).
+- Added `server/.env.neon`, `server/.neon` to `.gitignore` (written by the Neon CLI; contain credentials).
+- Set up the two-agent branching convention (`agent/claude`, `agent/openai`, both pushed) and this session now works from `agent/claude` instead of `main`.
+- Ran `npx neon skills -y`, which added `.claude/skills/neon*` + `skills-lock.json` — Neon's own Claude Code skill docs, committed since they're just reference material (no secrets).
+- Local Postgres setup (`server/.pg-local`, pgAdmin) still works and is documented as a fallback, but is no longer the primary path.
+- Next: Chawki needs to claim the Neon project (`neon claim accept`) before it expires. The other agent should pull `server/.env.example`'s new shape and get the real connection strings from Chawki directly (never from git).
+
 ### 2026-10-14 — Claude (Claude Code) [2]
 - Got a working pgAdmin4 to browse the local DB visually. The system pgAdmin4 install was also broken (missing its entire `pgadmin` Python source package — same partial-install pattern as the missing Postgres CLI tools below). Rather than touch the system install, `pip install --target`'d the standalone `pgadmin4` package into `server/.pgadmin-local/site-packages` using the broken install's own bundled Python purely as a runtime.
 - Had to work around the bundled Python resolving `psycopg` from the system's (also broken) site-packages instead of the freshly installed one — fixed with a small launcher (`server/.pgadmin-local/launch.py`) that inserts the isolated path first in `sys.path`.
@@ -109,15 +120,27 @@ After every successful Lucie request, the backend prints token usage and an esti
 Lucie request usage: 1200 input tokens, 300 output tokens, estimated cost ~$0.0108
 ```
 
-To also save those logs in PostgreSQL, add `DATABASE_URL` to `server/.env`:
+To also save those logs in PostgreSQL, add `DATABASE_URL` to `server/.env`.
+
+### Shared Neon Postgres (primary setup)
+
+Both agents and every machine that pulls this repo point at the **same** Neon Postgres instance, so usage logs stay in one place no matter where the app runs from.
 
 ```env
-DATABASE_URL=postgres://postgres@localhost:5433/lucie_marketplace_poc
+DATABASE_URL="postgresql://<user>:<password>@<host>-pooler.<region>.aws.neon.tech/neondb"
+DATABASE_URL_UNPOOLED="postgresql://<user>:<password>@<host>.<region>.aws.neon.tech/neondb"
 ```
 
-### Local Postgres without a system install
+- Use the **pooled** URL (`-pooler` host) for `DATABASE_URL` — that's what the app connects with at runtime.
+- Use the **unpooled/direct** URL for one-off schema work (`psql -f server/db/lucie_usage_logs.sql`, etc.) — Neon's own guidance is to avoid running migrations over the pooled connection.
+- `server/.env` is gitignored, so these values are **not** in git. Ask Chawki for the real connection strings and paste them into your own `server/.env` on each machine — `.env.example` has the placeholder shape.
+- `server/services/db.js` sets `ssl: { rejectUnauthorized: true }` automatically for any non-localhost `DATABASE_URL`, so Neon's required TLS just works — no extra config needed.
 
-The system-wide PostgreSQL 18 install on this machine was missing `initdb.exe`/`pg_ctl.exe`/`createdb.exe` (client-tools-only install), so `npm run db:setup` below won't work here. Instead, a project-local, portable Postgres lives at `server/.pg-local/pgsql` (official EDB binaries, `bin/` + `share/` + `lib/` only, gitignored) with its own cluster at `server/.pgdata` on port 5433, trust auth, matching the `DATABASE_URL` already in `.env`. It does **not** touch the system Postgres install or register a Windows service.
+This project's current Neon database was provisioned via [Claimable Neon](https://claimable.neon.tech) (no account needed to create it) and should be **claimed** into Chawki's own Neon account before it expires — ask him about `neon claim accept` if that hasn't happened yet.
+
+### Alternative: fully local Postgres (no cloud, single machine only)
+
+Useful for offline work, but each machine running this way has its **own** separate data — it won't be shared with the other agent or other machines. The system-wide PostgreSQL 18 install on this machine was missing `initdb.exe`/`pg_ctl.exe`/`createdb.exe` (client-tools-only install), so a project-local, portable Postgres lives at `server/.pg-local/pgsql` (official EDB binaries, gitignored) with its own cluster at `server/.pgdata` on port 5433, trust auth.
 
 ```bash
 cd server
@@ -125,20 +148,20 @@ npm run db:local:start   # start it
 npm run db:local:stop    # stop it
 ```
 
-If a machine has a working full PostgreSQL 18 install instead, use the scripts below (`db:setup` / `db:start`) and ignore this section.
+Then set `DATABASE_URL=postgres://postgres@localhost:5433/lucie_marketplace_poc` in `server/.env` instead of the Neon URL.
 
-### Browsing the DB with pgAdmin4
+#### Browsing a local DB with pgAdmin4
 
-The system pgAdmin4 install on this machine was also broken (same partial-install issue as above — its `pgadmin` Python source package was missing). A project-local pgAdmin4 lives at `server/.pgadmin-local` (pip-installed, isolated, gitignored), already configured with a "Lucie Marketplace POC" server pointing at the local Postgres above.
+The system pgAdmin4 install on this machine was also broken (missing its `pgadmin` Python source package). A project-local pgAdmin4 lives at `server/.pgadmin-local` (pip-installed, isolated, gitignored).
 
 ```bash
 cd server
 npm run pgadmin:start
 ```
 
-Then open http://127.0.0.1:5050 — no login needed (desktop mode), the server connection is already registered. This is entirely optional: `lucie_usage_logs` can also be queried directly with `./.pg-local/pgsql/bin/psql.exe -h localhost -p 5433 -U postgres -d lucie_marketplace_poc`.
+Then open http://127.0.0.1:5050 — no login needed (desktop mode). This is entirely optional: `lucie_usage_logs` can also be queried directly with `./.pg-local/pgsql/bin/psql.exe` (local) or any `psql`/Neon connection string (shared).
 
-On Windows with PostgreSQL 18 installed, this POC includes an automatic setup script:
+If a machine has a working full PostgreSQL 18 install instead, this POC includes an automatic setup script:
 
 ```powershell
 cd server

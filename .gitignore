@@ -1,5 +1,7 @@
 .env
 server/.env
+server/.env.neon
+server/.neon
 node_modules/
 dist/
 server/.pgdata/
