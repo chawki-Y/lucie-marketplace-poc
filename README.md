@@ -15,6 +15,16 @@ This repo is worked on by multiple AI agents from separate local clones. Convent
 
 Keep entries short — a few bullet points, not a full diff. The next agent should be able to read this log alone and know what state the repo is in.
 
+### Branching
+
+Two agents work on this repo at once, so each gets its own branch to avoid stepping on the other's uncommitted work:
+
+- `main` — stable, integration branch. Both agents merge into this when a change is verified working.
+- `agent/claude` — Claude's working branch.
+- `agent/openai` — the OpenAI-based agent's working branch.
+
+Pull `main` into your branch before starting a session, do your work on your own branch, then merge (or PR) back into `main` once it's verified — don't push work-in-progress straight to `main`.
+
 ### 2026-10-14 — Claude (Claude Code) [2]
 - Got a working pgAdmin4 to browse the local DB visually. The system pgAdmin4 install was also broken (missing its entire `pgadmin` Python source package — same partial-install pattern as the missing Postgres CLI tools below). Rather than touch the system install, `pip install --target`'d the standalone `pgadmin4` package into `server/.pgadmin-local/site-packages` using the broken install's own bundled Python purely as a runtime.
 - Had to work around the bundled Python resolving `psycopg` from the system's (also broken) site-packages instead of the freshly installed one — fixed with a small launcher (`server/.pgadmin-local/launch.py`) that inserts the isolated path first in `sys.path`.
