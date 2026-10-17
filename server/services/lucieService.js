@@ -14,40 +14,42 @@ Do not use Markdown formatting. Write plain chat text that looks clean in a simp
 If no listings fit, say so and suggest a practical adjustment.
 `;
 
-const tools = [
+export const tools = [
   {
     type: "function",
     name: "searchListings",
     description: "Search the marketplace listings JSON data using product text, category, price, condition, and location filters.",
+    strict: true,
     parameters: {
       type: "object",
       properties: {
         query: {
-          type: "string",
+          type: ["string", "null"],
           description: "A product, keyword, brand, or need to search for."
         },
         category: {
-          type: "string",
-          enum: ["Electronics", "Phones", "Computers", "Gaming", "Home", "Fashion"],
+          type: ["string", "null"],
+          enum: ["Electronics", "Phones", "Computers", "Gaming", "Home", "Fashion", null],
           description: "Marketplace category to filter by."
         },
         minPrice: {
-          type: "number",
+          type: ["number", "null"],
           description: "Minimum listing price in USD."
         },
         maxPrice: {
-          type: "number",
+          type: ["number", "null"],
           description: "Maximum listing price in USD."
         },
         condition: {
-          type: "string",
+          type: ["string", "null"],
           description: "Condition text such as Used, Excellent, Like New, or New."
         },
         location: {
-          type: "string",
+          type: ["string", "null"],
           description: "Lebanese city or area, such as Beirut, Metn, Byblos, Tripoli, Baabda, Jounieh, or Zahle."
         }
       },
+      required: ["query", "category", "minPrice", "maxPrice", "condition", "location"],
       additionalProperties: false
     }
   },
@@ -55,6 +57,7 @@ const tools = [
     type: "function",
     name: "getListingDetails",
     description: "Get one marketplace listing by its ID.",
+    strict: true,
     parameters: {
       type: "object",
       properties: {
@@ -77,19 +80,21 @@ function getOpenAIClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-function parseArguments(rawArguments) {
+export function parseArguments(rawArguments) {
   if (!rawArguments) {
     return {};
   }
 
   try {
-    return JSON.parse(rawArguments);
+    const parsed = JSON.parse(rawArguments);
+    const isPlainObject = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
+    return isPlainObject ? parsed : {};
   } catch {
     return {};
   }
 }
 
-async function runToolCall(toolCall) {
+export async function runToolCall(toolCall) {
   const args = parseArguments(toolCall.arguments);
 
   if (toolCall.name === "searchListings") {
@@ -149,8 +154,8 @@ async function finishLucieResponse({ model, messages, message, products, toolsCa
   };
 }
 
-export async function chatWithLucie(messages) {
-  const client = getOpenAIClient();
+export async function chatWithLucie(messages, { client: injectedClient } = {}) {
+  const client = injectedClient || getOpenAIClient();
 
   if (!client) {
     console.warn("Lucie AI request skipped. Create server/.env with OPENAI_API_KEY=...");
@@ -160,7 +165,10 @@ export async function chatWithLucie(messages) {
     };
   }
 
-  const foundProducts = new Map();
+  // Only the most recent round's tool results are shown as product cards —
+  // earlier rounds (e.g. a broad search the model then narrowed) are stale
+  // by the time Lucie writes her final answer.
+  let latestProducts = new Map();
   const toolsCalled = [];
   let totalUsage = {
     inputTokens: 0,
@@ -190,7 +198,7 @@ export async function chatWithLucie(messages) {
         model,
         messages,
         message: response.output_text || "I can help you search the marketplace. What are you looking for?",
-        products: Array.from(foundProducts.values()).slice(0, 4),
+        products: Array.from(latestProducts.values()).slice(0, 4),
         toolsCalled,
         totalUsage
       });
@@ -198,6 +206,7 @@ export async function chatWithLucie(messages) {
 
     input = input.concat(response.output);
 
+    const roundProducts = new Map();
     for (const toolCall of functionCalls) {
       const result = await runToolCall(toolCall);
       toolsCalled.push({
@@ -206,7 +215,7 @@ export async function chatWithLucie(messages) {
       });
 
       result.products.forEach((product) => {
-        foundProducts.set(product.id, product);
+        roundProducts.set(product.id, product);
       });
 
       input.push({
@@ -215,13 +224,14 @@ export async function chatWithLucie(messages) {
         output: JSON.stringify(result.output)
       });
     }
+    latestProducts = roundProducts;
   }
 
   return finishLucieResponse({
     model,
     messages,
     message: "I found a few marketplace options that may help. Here are the strongest matches from the listings.",
-    products: Array.from(foundProducts.values()).slice(0, 4),
+    products: Array.from(latestProducts.values()).slice(0, 4),
     toolsCalled,
     totalUsage
   });

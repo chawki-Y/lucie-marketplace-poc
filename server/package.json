@@ -9,6 +9,7 @@
     "db:local:start": "./.pg-local/pgsql/bin/pg_ctl.exe -D ./.pgdata -o \"-p 5433\" -l ./.pgdata/logs/postgres.log -w start",
     "db:local:stop": "./.pg-local/pgsql/bin/pg_ctl.exe -D ./.pgdata stop",
     "pgadmin:start": "\"C:\\Program Files\\PostgreSQL\\18\\pgAdmin 4\\python\\python.exe\" ./.pgadmin-local/launch.py",
+    "test": "node --test tests/*.test.js",
     "dev": "node --watch server.js",
     "start": "node server.js"
   },
